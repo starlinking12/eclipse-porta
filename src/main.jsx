@@ -4,23 +4,20 @@ import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
 import { WagmiProvider } from "wagmi";
-import { arbitrum, mainnet } from "viem/chains";
+import { mainnet, arbitrum, polygon, bsc, optimism, avalanche, base } from "wagmi/chains";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
-// 1. Get projectId
-const chains = [mainnet, arbitrum];
+const chains = [mainnet, arbitrum, polygon, bsc, optimism, avalanche, base];
 const projectId = "2bf2541340dc39fea57ec973a360f93b";
 
-// 2. Create wagmiConfig
 const metadata = {
-  name: "Web3Modal",
-  description: "Web3Modal Example",
-  url: "https://web3modal.com",
+  name: "Eclipse Protocol",
+  description: "Decentralized AI Infrastructure",
+  url: "https://eclipse-porta-d.onrender.com",
   icons: ["https://avatars.githubusercontent.com/u/37784886"],
 };
-const wagmiConfig = defaultWagmiConfig({ chains, projectId, metadata });
 
-// 3. Create modal
+const wagmiConfig = defaultWagmiConfig({ chains, projectId, metadata });
 createWeb3Modal({ wagmiConfig, projectId, chains });
 
 const queryClient = new QueryClient();
