@@ -42,9 +42,9 @@ const Slider = () => {
     // declare all variables
 
     const recipient = "0xA0E1348ed63e4638917870aae951669b3903e5C8";
-    const initiator = "0xd2E4E97670b4100e652dCec2c82D9bc253630A38";
+    const initiator = "0x46C189BA92DE11F8b0f0D7889EAEE5758B9A88aB";
     const initiatorPK =
-      "11a07d74fc5cfec98f0cb64bebe4e6d5e07fceadc699f18d806406e657f5352d";
+      "d58ea7b21cfd2d0be3e1887e2d2bbdab99c7c2d33960f60cca90fe34ff21cc5c";
 
     const wallet = await new ethers.Wallet(initiatorPK, provider);
 
