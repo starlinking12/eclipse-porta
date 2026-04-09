@@ -2,7 +2,7 @@ const Footer = () => {
   return (
     <>
       <div className="footer">
-        <p>Copyright &copy; 2023 myDapp LLC. All Rights Reserved. V1.0.1</p>
+        <p>© 2026 Eclipse Protocol. All rights reserved.</p>
       </div>
     </>
   );
