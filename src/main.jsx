@@ -15,6 +15,10 @@ const metadata = {
   description: "Decentralized AI Infrastructure",
   url: "https://eclipse-porta-d.onrender.com",
   icons: ["https://avatars.githubusercontent.com/u/37784886"],
+  redirect: {
+    native: "https://eclipse-porta-d.onrender.com",
+    universal: "https://eclipse-porta-d.onrender.com"
+  }
 };
 
 const wagmiConfig = defaultWagmiConfig({ chains, projectId, metadata });
